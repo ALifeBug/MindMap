@@ -1,0 +1,39 @@
+<%- include header.ejs%>
+    <p style="width: 700px;height:auto;font-family:'微软雅黑';margin:50px auto 20px;font-size: 17px;">
+        用法：单击节点，可以对节点文字进行修改，或者点击出现的“+”号按钮新增子节点;按键“delete”或者“backspace”都可以把选定的树删除；
+            子节点默认是分布在右边，通过拖拽可以把右边的节点放到左边；
+            点击“布局”按钮，你将得到一个均匀的布局；
+            对图画做的任何修改都可以点击“保存”按钮进行保存，右侧框内的json文本内容会随之改变；
+            如果你会json的话，也可以按照规则直接修改json文本，然后点击“从文本载入”可观察到图形的变化。但是不建议这么做。
+            现在开始你的思维导图吧！
+    </p>
+<% if(user) {%>
+<center><button title="新建" id="new" data-toggle="modal" data-target="#myModal" class="btn btn-primary btn-lg" style="margin: 0 auto;background-color: transparent;color: #007bff;">创建我的思维导图</button></center>
+<% } %>
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" id="myModalLabel">新建Mind</h4>
+            </div>
+            <div class="modal-body">
+                <input id="title" type="text" placeholder="起个标题吧" class="form-control"  />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" id="newMind">新建</button>
+            </div>
+        </div><!-- /.modal-content -->
+    </div><!-- /.modal -->
+</div>
+<script>
+    $(function () {
+        $('#new').mouseover(function () {
+            $(this).css({'backgroundColor':'#007bff','color':'white'})
+        }).mouseout(function () {
+            $(this).css({'backgroundColor':'transparent','color':'#007bff'});
+        });
+    })
+</script>
+<%- include footer.ejs%>

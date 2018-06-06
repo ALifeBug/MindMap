@@ -1,0 +1,13 @@
+<%- include header.ejs%>
+<link href="/stylesheets/form.css" rel="stylesheet">
+<script src="/javascripts/reg.js" type="text/javascript"></script>
+<div style="margin-left: 580px;margin-top: 40px;">
+<form action="/reg" method="post" id="form">
+    <div><input type="text" name="name" id="name" placeholder="您的昵称,不超过15位字符" class="form-input" required maxlength="15"><span id="name-error"></span></div>
+    <div><input type="text" name="email" id="email" placeholder="Email address" class="form-input" required><span id="email-error"></span></div>
+    <div><input type="password" name="password" id="password" placeholder="Password" class="form-input" required></div>
+    <div><input type="password" id="password-repeat" placeholder="Confirm your password"  class="form-input" required><span id="repeat-error"></span></div>
+    <div><input type="submit" value="Sign Up" class="button"></div>
+</form>
+</div>
+<%- include footer.ejs%>

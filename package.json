@@ -1,0 +1,26 @@
+{
+  "name": "demo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www"
+  },
+  "dependencies": {
+    "connect-flash": "~0.1.1",
+    "connect-mongo": "^0.8.1",
+    "cookie-parser": "~1.4.3",
+    "debug": "~2.6.9",
+    "ejs": "~2.5.7",
+    "express": "~4.16.0",
+    "express-session": "^1.15.6",
+    "gojs": "^1.8.20",
+    "html2canvas": "^1.0.0-alpha.12",
+    "http-errors": "~1.6.2",
+    "mongodb": "2.2.20",
+    "mongoose": "^5.1.2",
+    "morgan": "~1.9.0",
+    "nodemailer": "*",
+    "socket.io": "*",
+    "underscore": "*"
+  }
+}
