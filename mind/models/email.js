@@ -2,7 +2,7 @@ var nodemailer = require('nodemailer');
 
 var config = {
     host: 'smtp.163.com',//主机
-    port: 25,//端口
+    port: 465,//端口
     secureConnection:true,//使用SSL加密
     auth:{
         user:'18811503658@163.com',

@@ -1,4 +1,5 @@
 <%- include header.ejs%>
+<script src="https://cdn.bootcss.com/bootstrap-confirmation/1.0.0/bootstrap-confirmation.js"></script>
 <link  href="/stylesheets/file.css" rel="stylesheet" />
 <script type="text/javascript">
  $(function () {
@@ -11,6 +12,11 @@
          btnOkClass:' btn btn-default btn-sm',
          btnCancelClass:'btn btn-primary btn-sm'
      });
+     $('tr').mouseover(function () {
+         $(this).find('button').css('visibility','visible');
+     }).mouseout(function () {
+         $(this).find('button').css('visibility','hidden');
+     })
  })
 </script>
     <div>
@@ -27,8 +33,8 @@
                 <td><%= minds[i].editor%></td>
                 <td><%= minds[i].time%></td>
                 <td>
-                    <a href="/mind/load?id=<%=minds[i]._id%>"><button class="btn btn-success btn-sm">编辑</button></a>
-                    <a href="/mind/remove?id=<%=minds[i]._id%>"><button class="btn btn-danger btn-sm confirmation" >删除</button></a>
+                    <a href="/mind/load?id=<%=minds[i]._id%>"><button class="btn btn-success btn-sm" style="visibility: hidden">编辑</button></a>
+                    <a href="/mind/remove?id=<%=minds[i]._id%>"><button class="btn btn-danger btn-sm confirmation" style="visibility: hidden">删除</button></a>
                 </td>
             </tr>
             <% } %>

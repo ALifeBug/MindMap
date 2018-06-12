@@ -50,35 +50,38 @@ io.on('connection',function (socket) {
     });
 
     socket.on('invite',function (data) {
-        var toName = data.to;
-        var toId;
+        var toName = data.to;//被邀请者的名字
+        var toId;//被邀请者的socket id
         var arr = data.url.split('=');
         var roomid = arr[arr.length-1];//以mind的id作为房间名
-        socket.join(roomid);
-        if(!room[roomid]) {
+        if(!room[roomid]) {            //如果房间不存在，则创建房间，并将邀请者加入房间
             room[roomid] = [];
             room[roomid].push(data.from);
         }
         if(toId = hashName[toName]){
             io.to(toId).emit('invited',{'from':data.from,'url':data.url,'roomid':roomid,'to':data.to});
         }
+        io.to(socket.id).emit('invitesuccess');
+        console.log(data.from+" to "+data.to);
     });
 
     socket.on('join',function (data) {
-        var id = data.roomid;
-        var inRoom = false;
+        var id = data.roomid;//新加入者传来的房间id
+        var inRoom = false;//是否已经在小组内
         var arr = room[id];
-        for(var i=0;i<arr.length;i++){
+        for(var i=0;i<arr.length;i++){ //通过遍历小组成员判断
             if(arr[i]===data.name){
                inRoom=true;
             }
         }
-        if(!inRoom){
-            room[id].push(data.name);
-            socket.join(data.roomid);
+        if(!inRoom){ //如果不在小组
+            room[id].push(data.name);//加入小组
+            io.to(socket.id).emit('joinsuccess');
+            socket.to(id).emit('sys',{'msg':'join','name':data.name,'team':room[id]}); //广播新增成员的消息
         }
     });
 
+    //由于socket是不断断开与连接的，所以添加重新加入的函数
     socket.on('rejoin',function (data) {
         var id = data.roomid;
         var inroom = false;
@@ -91,6 +94,7 @@ io.on('connection',function (socket) {
               }
             }
         }
+
         //返回该思维导图是否是该用户所有
         var own=false;
         Mind.getOne({"_id":id},function (err,mind) {
@@ -100,9 +104,10 @@ io.on('connection',function (socket) {
                 if(mind.editor===data.name)
                     own=true;
                 var toId = data.socketid;
-                io.to(toId).emit('inOrnot',{'in':inroom,'own':own});
+                io.to(toId).emit('inOrnot',{'in':inroom,'own':own,'team':room[id]});
             }
         });
+
     });
 
     socket.on('leave',function (data) {
@@ -113,6 +118,13 @@ io.on('connection',function (socket) {
             room[roomID].splice(index, 1);
         }
         socket.leave(roomID);    // 退出房间
+
+        if(room[roomID].length===0){ //如果当前房间里已经没人了，则要删除该房间
+            delete room[roomID];
+            console.log('房间被删除');
+        }else { //如果还有组员，则需要广播该组员离开的消息
+            socket.to(roomID).emit('sys', {'msg': 'leave', 'name': user, 'team': room[roomID]});
+        }
     });
 
     socket.on('message',function (msg) {

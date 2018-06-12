@@ -1,11 +1,20 @@
 <%- include header.ejs%>
-    <p style="width: 700px;height:auto;font-family:'微软雅黑';margin:50px auto 20px;font-size: 17px;">
-        用法：单击节点，可以对节点文字进行修改，或者点击出现的“+”号按钮新增子节点;按键“delete”或者“backspace”都可以把选定的树删除；
-            子节点默认是分布在右边，通过拖拽可以把右边的节点放到左边；
-            点击“布局”按钮，你将得到一个均匀的布局；
-            对图画做的任何修改都可以点击“保存”按钮进行保存，右侧框内的json文本内容会随之改变；
-            如果你会json的话，也可以按照规则直接修改json文本，然后点击“从文本载入”可观察到图形的变化。但是不建议这么做。
-            现在开始你的思维导图吧！
+    <p style="width: 700px;height:auto;font-family:'Calibri';margin:50px auto 20px;font-size: 17px;">
+        <span style="font-weight: bold">注册登录</span>:使用本网站功能前需要注册一个账户，填写信息，登录后主页会有创建思维导图的入口点击即可进入编辑<br>
+        <span style="font-weight: bold">新建</span>:点击新建按钮起好标题即可创建一个思维导图并保存到我的文件中，来到编辑页面，初始化为一个根节点<br>
+        <span style="font-weight: bold">我的文件</span>:该页面可以查看用户的历史文件,并进入编辑或删除文件<br>
+        <span style="font-weight: bold">保存</span>:用户在编辑时可以随时点击保存按钮保存自己的工作进度<br>
+        <span style="font-weight: bold">添加子节点</span>:选中节点，出现“+”号,点击添加子节点。<br>
+        <span style="font-weight: bold">编辑内容</span>:双击节点,出现输入框,输入内容，点击空白处取消选中即可修改内容<br>
+        <span style="font-weight: bold">改变样式</span>:选择节点右键菜单中可以选择形状,字体,或者点击右上方的改变字体样式,大小,以及节点的填充颜色来改变样式<br>
+        <span style="font-weight: bold">重新布局</span>:右键菜单中点击重新布局可以整理当前页面<br>
+        <span style="font-weight: bold">改变布局</span>:通过点击右上方的改变布局按钮选择布局:下侧分布,左侧分布,右侧分布,左右分布<br>
+        <span style="font-weight: bold">下载文件</span>:点击下载pdf文件,目前只支持pdf格式<br>
+        <span style="font-weight: bold">改变级数</span>:选择节点右键向前一级,可以将该节点往前提升一级,或者选择改变父节点,会显示出所有节点的编号,以及上方的输入框,输入节点编号确定即可
+        改变当前节点的父节点,该节点的子节点会随之一起变动位置<br>
+        <span style="font-weight: bold">协同工作</span>:点击左上方的邀请按钮输入被邀请者的昵称,若对方在线即可收到邀请,接受后双方将在一个小组内,左上方会多出退出按钮,点击离开小组,
+        协同工作模式下,双方的操作将实时的显示给对方,若一方选中了一个节点,则其他人将无法选中该节点进行编辑<br>
+        <span style="font-size: 17px;font-weight:bold;color: #ac2925">注意:思维导图页面若无法正常跳转,如果您使用的是360浏览器请切换到极速模式,IE浏览器请尝试较高的版本<br></span>
     </p>
 <% if(user) {%>
 <center><button title="新建" id="new" data-toggle="modal" data-target="#myModal" class="btn btn-primary btn-lg" style="margin: 0 auto;background-color: transparent;color: #007bff;">创建我的思维导图</button></center>
@@ -27,7 +36,11 @@
         </div><!-- /.modal-content -->
     </div><!-- /.modal -->
 </div>
+
 <script>
+    /*
+    控制新建按钮的样式
+     */
     $(function () {
         $('#new').mouseover(function () {
             $(this).css({'backgroundColor':'#007bff','color':'white'})
@@ -35,5 +48,25 @@
             $(this).css({'backgroundColor':'transparent','color':'#007bff'});
         });
     })
+
+    /*
+    新建mind函数，发送ajax请求
+     */
+    $('#newMind').click(function () {
+        if($('#title').val()===''){
+            $('#title').css('borderColor','#f41717');
+            return;
+        }else $.ajax({
+            type:"post",
+            url:"/mind/new",
+            data:{title:$('#title').val()},
+            success: function (data) {
+                if(data){
+                    window.location.href = 'http://47.95.194.211:3006/mind/load?id='+data.mindid;
+                }
+            }
+        })
+    });
 </script>
+
 <%- include footer.ejs%>

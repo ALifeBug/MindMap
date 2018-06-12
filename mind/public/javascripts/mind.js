@@ -1,4 +1,5 @@
 var pastselectednode=null;
+var adr =[];
 document.body.onload = function init() {
     var pasttextblock=null;
     var $ = go.GraphObject.make;
@@ -6,15 +7,13 @@ document.body.onload = function init() {
         $(go.Diagram, "myDiagramDiv",
             {
                 padding: 20,
-                // when the user drags a node, also move/copy/delete the whole subtree starting with that node
                 "commandHandler.copiesTree": true,
                 "commandHandler.deletesTree": true,
                 "draggingTool.dragsTree": true,
-                initialContentAlignment: go.Spot.Center,  // center the whole graph
+                initialContentAlignment: go.Spot.Center,
                 "undoManager.isEnabled": true
             });
-    // when the document is modified, add a "*" to the title and enable the "Save" button
-    myDiagram.addDiagramListener("Modified", function(e) {
+    myDiagram.addDiagramListener("Modified", function() {
         var button = document.getElementById("SaveButton");
         if (button) button.disabled = !myDiagram.isModified;
         var idx = document.title.indexOf("*");
@@ -24,10 +23,8 @@ document.body.onload = function init() {
             if (idx >= 0) document.title = document.title.substr(0, idx);
         }
     });
-    // this is the root node, at the center of the circular layers
 
 
-    // a node consists of some text with a line shape underneath
     myDiagram.nodeTemplate =
         $(go.Node,"Auto",
 
@@ -37,7 +34,6 @@ document.body.onload = function init() {
                 {name: "SHAPE",
                     stretch: go.GraphObject.Horizontal,
                     portId: "",
-                    //fromSpot: go.Spot.LeftRightSides, toSpot: go.Spot.LeftRightSides,
                     strokeWidth: 2,
                     stroke:'#ffc107'
                 },
@@ -46,12 +42,9 @@ document.body.onload = function init() {
                 new go.Binding("geometryString", "geometryString"),
                 new go.Binding("fill", "color"),
                 new go.Binding("stroke", "brush"),
-                // make sure links come in from the proper direction and go out appropriately
                 new go.Binding("fromSpot", "dir", function(d) { return spotConverter(d, true); }),
                 new go.Binding("toSpot", "dir", function(d) { return spotConverter(d, false); })),
-            // remember the locations of each node in the node data
             new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
-            // make sure text "grows" in the desired direction
             new go.Binding("locationSpot", "dir", function(d) { return spotConverter(d, false); }),
 
             $(go.TextBlock,
@@ -62,39 +55,42 @@ document.body.onload = function init() {
                     editable: true,
                     font:'11pt Microsoft Yahei',
                     stroke:'#343a40'
-                    //onblur:Submissionofmodification
                 },
-                // remember not only the text string but the scale and the font in the node data
                 new go.Binding("text", "text").makeTwoWay(),
                 new go.Binding("scale", "scale").makeTwoWay(),
                 new go.Binding("font", "font").makeTwoWay())
 
         );
 
-
-    // selected nodes show a button for adding children
     myDiagram.nodeTemplate.selectionAdornmentTemplate =
         $(go.Adornment, "Spot",
             $(go.Panel, "Auto",
-                // this Adornment has a rectangular blue Shape around the selected node
                 $(go.Shape, { fill: null, stroke: "dodgerblue", strokeWidth: 3 }),
                 $(go.Placeholder, { margin: new go.Margin(4, 4, 0, 4) })
             ),
-            // and this Adornment has a Button to the right of the selected node
             $("Button",
                 {
                     alignment: go.Spot.Right,
                     alignmentFocus: go.Spot.Left,
-                    click: addNodeAndLink  // define click behavior for this Button in the Adornment
+                    click: addNodeAndLink
                 },
-                $(go.TextBlock, "+",  // the Button content
+                $(go.TextBlock, "+",
                     { font: "bold 8pt sans-serif" })
             )
         );
-    // the context menu allows users to change the font size and weight,
-    // and to perform a limited tree layout starting at that node
     myDiagram.nodeTemplate.contextMenu =
         $(go.Adornment, "Vertical",
+            $("ContextMenuButton",
+                $(go.TextBlock, "向前一级"),
+                { click: function(e, obj) { changeLevel(obj); } },
+                new go.Binding("visible", "",
+                    function(obj) {
+                        if(obj.part.adornedPart.data.key === 0 || obj.part.adornedPart.data.parent === 0)
+                            return false;else return true; }).ofObject()),
+            $("ContextMenuButton",
+                $(go.TextBlock, "改变父节点"),
+                { click: function(e, obj) {  changeParent(obj);} },
+                new go.Binding("visible", "", function(obj) { if(obj.part.adornedPart.data.key === 0)return false;else return true ;}).ofObject()),
             $("ContextMenuButton",
                 $(go.TextBlock, "字体放大"),
                 { click: function(e, obj) { changeTextSize(obj, 1.1); } }),
@@ -115,7 +111,6 @@ document.body.onload = function init() {
                     }
                 }
             ),
-            /////////////
 
             $("ContextMenuButton",
                 $(go.TextBlock, "椭圆"),
@@ -130,7 +125,6 @@ document.body.onload = function init() {
                 $(go.TextBlock, "线形"),
                 { click: function(e, obj) { changeToLine(obj); } })
         );
-    // a link is just a Bezier-curved line of the same color as the node to which it is connected
     myDiagram.linkTemplate =
         $(go.Link,
             {
@@ -142,32 +136,24 @@ document.body.onload = function init() {
             {   routing: go.Link.Orthogonal,
                 corner: 10},
             $(go.Shape,
-                { strokeWidth: 1 },
+                { strokeWidth: 2 },
                 new go.Binding("stroke", "toNode", function(n) {
                     if (n.data.brush) return n.data.brush;
                     return "#fd7e14";
                 }).ofObject())
         );
-    // the Diagram's context menu just displays commands for general functionality
     myDiagram.contextMenu =
         $(go.Adornment, "Vertical",
             $("ContextMenuButton",
-                $(go.TextBlock, "Undo"),
+                $(go.TextBlock, "撤销"),
                 { click: function(e, obj) { e.diagram.commandHandler.undo(); } },
                 new go.Binding("visible", "", function(o) { return o.diagram && o.diagram.commandHandler.canUndo(); }).ofObject()),
             $("ContextMenuButton",
-                $(go.TextBlock, "Redo"),
+                $(go.TextBlock, "重做"),
                 { click: function(e, obj) { e.diagram.commandHandler.redo(); } },
                 new go.Binding("visible", "", function(o) { return o.diagram && o.diagram.commandHandler.canRedo(); }).ofObject()),
-            $("ContextMenuButton",
-                $(go.TextBlock, "Save"),
-                { click: function(e, obj) { save(); } }),
-            $("ContextMenuButton",
-                $(go.TextBlock, "Load"),
-                { click: function(e, obj) { load(); } })
         );
-    //////////
-    ///*
+
     myDiagram.addDiagramListener("ChangedSelection", function(e) {
         var bol = false;
         myDiagram.selection.each(function(node) {
@@ -192,12 +178,10 @@ document.body.onload = function init() {
             pastselectednode=null;
         }
     });
-    //*//////////////
     myDiagram.addDiagramListener("SelectionDeleting", function(e) {
         myDiagram.selection.each(function(node) {
             var parent = JSON.stringify(node.data.parent);
             var key = JSON.stringify(node.data.key);
-            //alert("Delete key:"+key+",parent:"+parent);
             buliddata(node,"deletenode");
         });
     });
@@ -205,27 +189,21 @@ document.body.onload = function init() {
         var rootX = myDiagram.findNodeForKey(0).location.x;
         var root = myDiagram.findNodeForKey(0).data;
         myDiagram.selection.each(function(node) {
-            if (node.data.parent !== 0 || root.dir==='left' || root.dir==='right' || root.dir==='bottom') return; // Only consider nodes connected to the root
+            if (node.data.parent !== 0 || root.dir==='left' || root.dir==='right' || root.dir==='bottom') return;
             var nodeX = node.location.x;
-            //var nodeY = node.location.y;
-            //if(nodeY < (rootY + 20)){
             if (rootX < nodeX && node.data.dir !== "right") {
                 updateNodeDirection(node, "right");
-                //alert("Move to right key:"+JSON.stringify(node.data.key)+",parent:"+JSON.stringify(node.data.parent));
                 buliddata(node,"movetoright");
             } else if (rootX > nodeX && node.data.dir !== "left") {
                 updateNodeDirection(node, "left");
-                //alert("Move to left key:"+JSON.stringify(node.data.key)+",parent:"+JSON.stringify(node.data.parent));
                 buliddata(node,"movetoleft");
             }
-            //}else{ updateNodeDirection(node, "bottom");}
-
             layoutTree(node);
         });
     });
-    // read in the predefined graph using the JSON format data held in the "mySavedModel" textarea
-    load();
-}
+    //load();
+};
+
 function spotConverter(dir, from) {
     if (dir === "left") {
         return (from ? go.Spot.MiddleLeft : go.Spot.MiddleRight);
@@ -234,9 +212,6 @@ function spotConverter(dir, from) {
     }else if(dir === "bottom"){
         return (from ? go.Spot.MiddleBottom : go.Spot.MiddleTop);
     }
-    /*else if(dir === "leftright"){
-        return (go.Spot.LeftRightSides);
-    }*/
 }
 ////////
 function removenode(node,direction){
@@ -249,6 +224,206 @@ function removenode(node,direction){
     }
 }
 //////////
+function changeLevel(obj){
+    var adorn = obj.part;
+    adorn.diagram.startTransaction("Change Node Level");
+    var node = adorn.adornedPart;
+    var father = myDiagram.findNodeForKey(node.data.parent);
+    myDiagram.model.setDataProperty(node.data, "parent", father.data.parent);
+    myDiagram.model.setDataProperty(node.data, "figure", father.data.figure);
+    myDiagram.isModified = true;
+    buliddata(node,"changeLevelfront");
+    adorn.diagram.commitTransaction("Change Node Level");
+    layoutAll();
+}
+function rechangeLevel(node){
+    var father = myDiagram.findNodeForKey(node.data.parent);
+    myDiagram.model.setDataProperty(node.data, "parent", father.data.parent);
+    myDiagram.model.setDataProperty(node.data, "figure", father.data.figure);
+    myDiagram.isModified = true;
+}
+function listkey(node){
+    var chl = node.findTreeChildrenNodes();
+    while (chl.next()) {
+        var add = getAdornment();
+        add.adornedObject = chl.value;
+        chl.value.addAdornment("TextBlockOver", add);
+        adr.push(chl.value.data.key);
+        listkey(chl.value);
+    }
+}
+function removeAllAdornment(){
+    var len = adr.length;
+    for(var x =0;x<len;x++){
+        var node = myDiagram.findNodeForKey(adr[0]);
+        adr.splice(0,1);
+        node.removeAdornment("TextBlockOver");
+    }
+}
+
+
+function Formvisible(){
+    $('#chpaform').fadeIn();
+}
+function FormHidden() {
+    removeAllAdornment();
+    $('#chpaform').fadeOut();
+}
+
+
+function changeParent(obj){
+    var adorn = obj.part;
+    adorn.diagram.startTransaction("Change Parent");
+    var node = adorn.adornedPart;
+    var rootNode = myDiagram.findNodeForKey(0);
+    var add = getAdornment();
+    add.adornedObject = rootNode;
+    rootNode.addAdornment("TextBlockOver", add);
+    adr.push(0);
+    listkey(rootNode);
+    Formvisible();
+
+    var pNode = null;
+    document.getElementById('ok').onclick = function () {
+
+        var pKey = $('#parentnum').val();
+        if (pKey === "") {
+            $('#parentnum').css('borderColor', '#dc3545');
+        }
+        else {
+            pKey = 0 - pKey;
+            pNode = myDiagram.findNodeForKey(pKey);
+            if (pNode !== null && pNode.data.key !== node.data.key) {
+                removeAllAdornment();
+                FormHidden();
+                var treePartIta = node.findTreeParts().iterator;    //获取选中节点所在子树的所有节点和连线迭代器
+                var Ita = node.findTreeParts().iterator;
+                var isChildKey = false;                     //判断指定父节点是否为其子节点
+                while (Ita.next()) {
+                    if (Ita.value.data.key == pKey) {
+                        isChildKey = true;
+                        break;
+                    }
+                }
+                if (isChildKey) {     //指定父节点为其子节点，则所有直接子节点向前一级，源节点再插入指定位置，参数中无需改变方向
+                    var childNodes = node.findTreeChildrenNodes();
+                    while (childNodes.next()) {
+                        myDiagram.model.setDataProperty(childNodes.value.data, "parent", node.data.parent);//直接子节点改变父节点号
+                        if (node.data.parent == 0) {              //根据前一级是否为根节点改变形状或几何参数值
+                            delete childNodes.value.data.geometryString;
+                            myDiagram.model.setDataProperty(childNodes.value.data, "figure", "RoundedRectangle");
+                        }
+                        else {
+                            delete childNodes.value.data.figure;
+                            myDiagram.model.setDataProperty(childNodes.value.data, "geometryString", "M 0 20 L 20 20");
+                        }
+                    }
+                    myDiagram.model.setDataProperty(node.data, "parent", pKey);     //改变选中节点的父节点号和形状
+                    delete node.data.figure;
+                    myDiagram.model.setDataProperty(node.data, "geometryString", "M 0 20 L 20 20");
+                }
+                else {               //指定父节点不为其子节点，则将其所在整棵子树移到指定位置
+                    myDiagram.model.setDataProperty(node.data, "parent", pKey);//改变选中节点的父节点号
+                    if (pNode.data.key == 0) {                  //根据指定父节点是否为根节点改变选中节点形状或几何参数值
+                        // if(node.data.geometryString)
+                        delete node.data.geometryString;
+                        // alert();
+                        myDiagram.model.setDataProperty(node.data, "figure", "RoundedRectangle");
+                    }
+                    else {
+                        delete node.data.figure;
+                        myDiagram.model.setDataProperty(node.data, "geometryString", "M 0 20 L 20 20");
+                    }
+                    var root = myDiagram.findNodeForKey(0);
+                    while (treePartIta.next()) {              //正常情况treePartIta应从首个元素开始迭代
+                        //改变选中节点所在子树中所有节点的方向,若指定父节点为根节点则默认方向为右(根节点无方向)
+                        if (root.data.dir == "bottom")
+                            myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey == 0) ? "bottom" : pNode.data.dir);
+                        else if (root.data.dir == "left") {
+                            myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey == 0) ? "left" : pNode.data.dir);
+                        }
+                        else
+                            myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey == 0) ? "right" : pNode.data.dir);
+                    }
+
+                }
+                myDiagram.isModified = true;
+                buliddata(node, "changeparent", pKey);
+                layoutAll();
+            }
+        }
+    };
+    adorn.diagram.commitTransaction("Change Parent");
+}
+
+function rechangeParent(node,pKey){
+    var pNode = myDiagram.findNodeForKey(pKey);
+    if(pNode.isInTreeOf(node)){//指定父节点为其子节点，则所有直接子节点向前一级，源节点再插入指定位置，参数中无需改变方向
+        var childNodes = node.findTreeChildrenNodes();
+        while (childNodes.next()) {
+            myDiagram.model.setDataProperty(childNodes.value.data, "parent", node.data.parent);//直接子节点改变父节点号
+            if (node.data.parent == 0) {              //根据前一级是否为根节点改变形状或几何参数值
+                delete childNodes.value.data.geometryString;
+                myDiagram.model.setDataProperty(childNodes.value.data, "figure", "RoundedRectangle");
+            }
+            else {
+                delete childNodes.value.data.figure;
+                myDiagram.model.setDataProperty(childNodes.value.data, "geometryString", "M 0 20 L 20 20");
+            }
+        }
+        myDiagram.model.setDataProperty(node.data, "parent", pKey);     //改变选中节点的父节点号和形状
+        delete node.data.figure;
+        myDiagram.model.setDataProperty(node.data, "geometryString", "M 0 20 L 20 20");
+    }
+    else{//指定父节点不为其子节点，则将其所在整棵子树移到指定位置
+        myDiagram.model.setDataProperty(node.data, "parent", pKey);//改变选中节点的父节点号
+        if (pNode.data.key == 0) {                  //根据指定父节点是否为根节点改变选中节点形状或几何参数值
+            delete node.data.geometryString;
+            myDiagram.model.setDataProperty(node.data, "figure", "RoundedRectangle");
+        }
+        else {
+            delete node.data.figure;
+            myDiagram.model.setDataProperty(node.data, "geometryString", "M 0 20 L 20 20");
+        }
+//                        alert(Ita.key+","+treePartIta.key);     //若出错极大可能与Ita有关！！！
+        var root = myDiagram.findNodeForKey(0);
+        while(treePartIta.next()){              //正常情况treePartIta应从首个元素开始迭代
+            //改变选中节点所在子树中所有节点的方向,若指定父节点为根节点则默认方向为右(根节点无方向)
+            if(root.data.dir == "bottom")
+                myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey==0)?"bottom":pNode.data.dir);
+            else if(root.data.dir == "left"){
+                myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey==0)?"left":pNode.data.dir);
+            }
+            else
+                myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey==0)?"right":pNode.data.dir);
+        }
+    }
+    myDiagram.isModified = true;
+}
+
+
+/*function rechangeParent(node,pKey){
+    myDiagram.model.setDataProperty(node.data, "parent", pKey);
+    if(pKey==0){z
+        if(node.data.geometryString)
+            delete node.data.geometryString;
+        myDiagram.model.setDataProperty(node.data,"figure","RoundedRectangle");
+    }
+    else{
+        if(node.data.figure)
+            delete node.data.figure;
+        myDiagram.model.setDataProperty(node.data,"geometryString","M 0 20 L 20 20");
+    }
+    var treePartIta = node.findTreeParts().iterator;
+    var pNode = myDiagram.findNodeForKey(pKey);
+    while(treePartIta.next()){
+        myDiagram.model.setDataProperty(treePartIta.value.data, "dir", (pKey==0)?"right":pNode.data.dir);
+    }
+    myDiagram.isModified = true;
+    //layoutAll();
+}*/
+
+
 function changeTextSize(obj, factor) {
     var adorn = obj.part;
     adorn.diagram.startTransaction("Change Text Size");
@@ -282,7 +457,13 @@ function toggleTextWeight(obj) {
 function retoggleTextWeight(node,idx) {
     var tb = node.findObject("TEXT");
     if (idx < 0) tb.font = "bold " + tb.font;
-    else tb.font = tb.font.substr(idx + 5);
+    else{
+        var a = tb.font.split(" ");
+        if(a[0]==="bold"){
+            a.splice(0,1);
+        }
+        tb.font=a.join(" ");
+    }
 }
 ////////
 function changeToEllipse(obj) {
@@ -292,7 +473,7 @@ function changeToEllipse(obj) {
     if(node.data.figure) myDiagram.model.setDataProperty(node.data, "figure", "Ellipse");
     else {delete node.data.geometryString;
         myDiagram.model.setDataProperty(node.data, "figure", "Ellipse");}
-        buliddata(node,"changetoEllipse");
+    buliddata(node,"changetoEllipse");
     adorn.diagram.commitTransaction("Change Shape");
 }
 function changeToRectangle(obj) {
@@ -302,7 +483,7 @@ function changeToRectangle(obj) {
     if(node.data.figure) myDiagram.model.setDataProperty(node.data, "figure", "RoundedRectangle");
     else {delete node.data.geometryString;
         myDiagram.model.setDataProperty(node.data, "figure", "RoundedRectangle");}
-        buliddata(node,"changetoRoundedRectangle");
+    buliddata(node,"changetoRoundedRectangle");
     adorn.diagram.commitTransaction("Change Shape");
 }
 function changeToCircle(obj) {
@@ -312,7 +493,7 @@ function changeToCircle(obj) {
     if(node.data.figure) myDiagram.model.setDataProperty(node.data, "figure", "Circle");
     else {delete node.data.geometryString;
         myDiagram.model.setDataProperty(node.data, "figure", "Circle");}
-        buliddata(node,"changetoCircle");
+    buliddata(node,"changetoCircle");
     adorn.diagram.commitTransaction("Change Shape");
 }
 function changeToLine(obj) {
@@ -357,17 +538,10 @@ function rechangeShape(node,shape) {
 }
 function updateNodeDirection(node, dir) {
     myDiagram.model.setDataProperty(node.data, "dir", dir);
-    // recursively update the direction of the child nodes
-    var chl = node.findTreeChildrenNodes(); // gives us an iterator of the child nodes related to this particular node
-    /*if(dir === "leftright"){
-        while(chl.next()) {
-            updateNodeDirection(chl.value, "right");
-        }
-    }else{*/
+    var chl = node.findTreeChildrenNodes();
     while(chl.next()) {
         updateNodeDirection(chl.value, dir);
     }
-    //}
 }
 function addNodeAndLink(e, obj) {
     var adorn = obj.part;
@@ -375,7 +549,6 @@ function addNodeAndLink(e, obj) {
     diagram.startTransaction("Add Node");
     var oldnode = adorn.adornedPart;
     var olddata = oldnode.data;
-    // copy the brush and direction to the new node data
     if(olddata.key === 0 ){
         if(olddata.dir === "left")
             var newdata = { text: "分支主题", figure:"RoundedRectangle",brush: olddata.brush, dir:"left",color: olddata.color , parent: olddata.key };
@@ -387,13 +560,10 @@ function addNodeAndLink(e, obj) {
             var newdata = { text: "分支主题", figure:"RoundedRectangle",brush: olddata.brush, dir:"right",color: olddata.color , parent: olddata.key };
     }
     else var newdata = { text: "子主题", geometryString:"M 0 20 L 20 20",brush: olddata.brush, dir: olddata.dir,color: olddata.color , parent: olddata.key };
-    //else var newdata = { text: "idea", figure:"LineH",brush: olddata.brush, dir: olddata.dir,color: olddata.color , parent: olddata.key };
     diagram.model.addNodeData(newdata);
-    //alert("Add node key:"+JSON.stringify(olddata.key)+",direction:"+JSON.stringify(olddata.dir));
     buliddata(oldnode,"addnode");
     layoutTree(oldnode);
     diagram.commitTransaction("Add Node");
-    // if the new node is off-screen, scroll the diagram to show the new node
     var newnode = diagram.findNodeForData(newdata);
     if (newnode !== null) diagram.scrollToRect(newnode.actualBounds);
 
@@ -496,50 +666,148 @@ function changeLayoutBottom(){
     updateNodeDirection(root, "bottom");
     buliddata(null,"layoutbottom");
     layoutAll();
-    //alert("Layout bottom!");
+    //e
 
 }
 function changeLayoutLeftright(){
     var root = myDiagram.findNodeForKey(0);
-    delete root.data.dir;
+    updateNodeDirection(root, "LeftRightSides");
+    var chl = root.findTreeChildrenNodes();
+    var ch2 = chl;
+    var len = chl.count;
+    for(var i=0;i< (len/2);i++){
+        if(ch2.next())
+            updateNodeDirection(ch2.value, "left");
+    }
+    for(i=(len/2);i<len;i++){
+        if(ch2.next())
+            updateNodeDirection(ch2.value, "right");
+        else break;
+    }
     save();
     load();
     buliddata(null,"layoutleftright");
     layoutAll();
-
 }
+
+function rechangeLayoutLeftright(){
+    var root = myDiagram.findNodeForKey(0);
+    updateNodeDirection(root, "LeftRightSides");
+    var chl = root.findTreeChildrenNodes();
+    var ch2 = chl;
+    var len = chl.count;
+    for(var i=0;i< (len/2);i++){
+        if(ch2.next())
+            updateNodeDirection(ch2.value, "left");
+    }
+    for(i=(len/2);i<len;i++){
+        if(ch2.next())
+            updateNodeDirection(ch2.value, "right");
+        else break;
+    }
+    save();
+    load();
+}
+
 function Submissionofmodification(node){
     var text = JSON.stringify(node.data.text);
     buliddata(node,"changetext");
     save();
 }
 
-//var timestamp=new Date().getTime();
 function deletechildtree(node){
     var chl = node.findTreeChildrenNodes();
     myDiagram.remove(node);
     while(chl.next()) {
         deletechildtree(chl.value);
     }
-    //myDiagram.model.removeParts(node.findTreeParts);
-    //myDiagram.model.removeNodeData(node.data);
 }
 
-function buliddata(node,operation){
+function changeFont(size){
+    myDiagram.selection.each(function(node) {
+        var tb = node.findObject("TEXT");
+        var arr = tb.font.split(" ");
+        arr[0] = size;
+        var str = arr.join(" ");
+        tb.font = str;
+        buliddata(node,"changefont");
+    });
+}
+function rechangeFont(node,fontvalue){
+    myDiagram.model.setDataProperty(node.data, "font", fontvalue);
+}
+function changeFontfamily(value){
+    myDiagram.selection.each(function(node) {
+        var tb = node.findObject("TEXT");
+        var arr = tb.font.split(" ");
+        if (arr[0] !== "bold")
+            var str = arr[0] + " " + value;
+        else
+            var str = arr[0] + " " + arr[1] + " " + value;
+        tb.font = str;
+        buliddata(node, "changefont");
+    });
+}
+
+function getAdornment(){
+    var nodeContextMenu =
+        go.GraphObject.make(go.Adornment, "Spot",
+            {background: "transparent" },  // to help detect when the mouse leaves the area
+            go.GraphObject.make(go.Placeholder),
+            go.GraphObject.make(go.Panel, "Auto",
+                { alignment: go.Spot.TopRight },
+                go.GraphObject.make(go.Shape,{
+                        figure:"Rectangle",
+                        stretch: go.GraphObject.Horizontal,
+                        fill:"yellow"
+                    }
+                ),
+                go.GraphObject.make(go.TextBlock, {
+                        margin:new go.Margin(1, 1, 1, 1),
+                        font:"bold 10pt sans-serif",
+                        editable: false,
+                    },
+                    new go.Binding("text", "",
+                        function(obj) {
+                            var key =0-obj.part.adornedPart.data.key;
+                            return  key; }).ofObject()
+                )
+
+            ));
+    return nodeContextMenu;
+}
+
+
+function buliddata(){
     var data = {};
-    //data.usrname = "uling";
-    data.op = operation;
-    if(node){
+    data.op = arguments[1];
+    if(arguments[0]){
+        var node = arguments[0];
         data.key = node.data.key;
         if(data.key !== 0)data.parent = node.data.parent;
         else {
             data.parent = 0;
             delete data.parent;
         }
-        if(operation === "changetext") data.text = node.data.text;
+        if(arguments[1] === "changetext") data.text = node.data.text;
         else{
             data.text = node.data.text;
             delete data.text;
+        }
+        if(arguments[1] === "changenodecolor") data.color = arguments[2];
+        else{
+            data.color=node.data.color;
+            delete  data.color;
+        }
+        if(arguments[1] === "changefont") data.font = node.data.font;
+        else{
+            data.font=node.data.font;
+            delete  data.font;
+        }
+        if(arguments[1] === "changeparent")data.parent = arguments[2];
+        else{
+            data.parent = node.data.parent;
+            delete data.parent;
         }
     }else{
         data.key = 0;
@@ -549,6 +817,7 @@ function buliddata(node,operation){
     }
     socket.emit('message',{'roomid':id,'syncmsg':JSON.stringify(data)});
 }
+
 function handledata(data){
     var obj = JSON.parse(data);
     if(obj.op === "changetext"){
@@ -565,15 +834,15 @@ function handledata(data){
         var node = myDiagram.findNodeForKey(obj.key);
         if(node.data.key === 0 ){
             if(node.data.dir === "left")
-                var newdata = { text: "子主题", figure:"RoundedRectangle",brush: node.data.brush, dir:"left",color: node.data.color , parent: node.data.key };
+                var newdata = { text: "分支主题", figure:"RoundedRectangle",font:node.data.font,brush: node.data.brush, dir:"left",color: node.data.color , parent: node.data.key };
             else if(node.data.dir === "right")
-                var newdata = { text: "子主题", figure:"RoundedRectangle",brush: node.data.brush, dir:"right",color: node.data.color , parent: node.data.key };
+                var newdata = { text: "分支主题", figure:"RoundedRectangle",font:node.data.font,brush: node.data.brush, dir:"right",color: node.data.color , parent: node.data.key };
             else if(node.data.dir === "bottom")
-                var newdata = { text: "子主题", figure:"RoundedRectangle",brush: node.data.brush, dir:"bottom",color: node.data.color , parent: node.data.key };
+                var newdata = { text: "分支主题", figure:"RoundedRectangle",font:node.data.font,brush: node.data.brush, dir:"bottom",color: node.data.color , parent: node.data.key };
             else
-                var newdata = { text: "子主题", figure:"RoundedRectangle",brush: node.data.brush, dir:"right",color: node.data.color , parent: node.data.key };
+                var newdata = { text: "分支主题", figure:"RoundedRectangle",font:node.data.font,brush: node.data.brush, dir:"right",color: node.data.color , parent: node.data.key };
         }
-        else var newdata = { text: "子主题", geometryString:"M 0 20 L 20 20",brush: node.data.brush, dir: node.data.dir,color: node.data.color , parent: node.data.key };
+        else var newdata = { text: "子主题", geometryString:"M 0 20 L 20 20",font:node.data.font,brush: node.data.brush, dir: node.data.dir,color: node.data.color , parent: node.data.key };
         myDiagram.model.addNodeData(newdata);
     }else if(obj.op === "layouttree"){
         relayoutAll();
@@ -594,9 +863,7 @@ function handledata(data){
         updateNodeDirection(root, "bottom");
     }else if(obj.op === "layoutleftright"){
         var root = myDiagram.findNodeForKey(0);
-        delete root.data.dir;
-        save();
-        load();
+        rechangeLayoutLeftright();
     }else if(obj.op === "deletenode"){
         var node = myDiagram.findNodeForKey(obj.key);
         deletechildtree(node);
@@ -608,10 +875,195 @@ function handledata(data){
     else if(obj.op === "changetoRoundedRectangle"){var node = myDiagram.findNodeForKey(obj.key);rechangeShape(node,"RoundedRectangle");}
     else if(obj.op === "changetoCircle"){var node = myDiagram.findNodeForKey(obj.key);rechangeShape(node,"Circle");}
     else if(obj.op === "changetoLine"){var node = myDiagram.findNodeForKey(obj.key);rechangeShape(node,"Line");}
+    //else if(obj.op === "changeLevelfront"){var node = myDiagram.findNodeForKey(obj.key);rechangeLevel(node);}
+    else if(obj.op === "changeLevelfront"){var node = myDiagram.findNodeForKey(obj.key);rechangeLevel(node,"front");}
+    else if(obj.op === "changeLevelbehind"){var node = myDiagram.findNodeForKey(obj.key);rechangeLevel(node,"behind");}
+    else if(obj.op === "changenodecolor"){var node = myDiagram.findNodeForKey(obj.key);myDiagram.model.setDataProperty(node.data, "color", obj.color);}
+    else if(obj.op === "changefont"){var node = myDiagram.findNodeForKey(obj.key);rechangeFont(node,obj.font)}
+    else if(obj.op === "changeparent"){var node = myDiagram.findNodeForKey(obj.key);rechangeParent(node,obj.parent)}
 }
 
 
+/**
+ * Created by sccy on 2018/6/9/0009.
+ */
+const socket = io('http://47.95.194.211:3006');
+var addr = window.location.href;
+var arr = addr.split('=');
+var id = arr[arr.length-1];
 
+/*
+保存函数
+ */
+function save() {
+    var addr = window.location.href;
+    var arr = addr.split('=');
+    var id = arr[arr.length-1];
+    var data = JSON.parse(myDiagram.model.toJson()).nodeDataArray;
+    $.ajax({
+        type:'post',
+        url:'/mind/save',
+        data:{
+            id:id,
+            newData:JSON.stringify(data)
+        },
+        success:function (data) {
+            if(data){
+                if(data.status==='success') {
+                    myDiagram.isModified = false;
+                    $('#SaveButton').attr('disabled',true);
+                    var idx = document.title.indexOf("*");
+                    if (idx >= 0) document.title = document.title.substr(0, idx);
+                }
+            }
+        }
+    })
+}
+
+/*
+加载函数
+ */
+function load() {
+    $.ajax({
+        type:"post",
+        url:'/mind/load',
+        data:{
+            id:id
+        },
+        success:function (data) {
+            if(data) {
+                var data ='{"class":"go.TreeModel","nodeDataArray":'+data.mymind+'}';
+                myDiagram.model = go.Model.fromJson(data);
+            }
+        }
+    });
+}
+
+
+/*
+邀请函数
+ */
+function invite() {
+    if($('#name').val()===''){
+        $('#name').css('borderColor','#f41717');
+    }else{
+        socket.emit('invite',{'to':$('#name').val(),
+            'from':username,
+            'url':'http://47.95.194.211:3006/mind/load?id='+id
+        });
+        save();
+        socket.on('invitesuccess',function () {
+            window.location.reload();
+        });
+
+    }
+}
+
+
+/*
+查询是否是当前页面的小组成员或者该页面是否为用户所有
+ */
+$(function () {
+
+    load();//加载文件
+
+    socket.on('inOrnot',function (data) {
+        if(data.in){
+            $('#LeaveButton').css('visibility','visible');//显示离开按钮
+            loadteam(data.team); //加载组员
+
+            $('#LeaveButton').bind('click',function () { //绑定离开事件
+                if(pastselectednode){
+                    buliddata(pastselectednode,"endselection");
+                }
+                socket.emit('leave',{id:id,user:username});
+                window.location.href="http://47.95.194.211:3006";
+            });
+
+            socket.on('new message',function (data) { //监听同步消息
+                handledata(data);
+            });
+
+            socket.on('sys',function (data) { //监听系统消息
+                if(data.msg==='join'){
+                    $('#sysModal').modal('show');
+                    $('#member').text('用户'+data.name+'加入了小组');
+                    loadteam(data.team);
+                }else if(data.msg==='leave'){
+                    $('#sysModal').modal('show');
+                    $('#member').text('用户'+data.name+'离开了小组');
+                    loadteam(data.team);
+                }
+            })
+        }else if(!data.own){ //如果当前用户不在小组内，并且该文件也不属于该用户，则回到主页
+            window.location.href="http://47.95.194.211:3006";
+        }
+    });
+    socket.emit('rejoin',{'name':username,'roomid':id,'socketid':socket.id});
+
+});
+
+/*
+ 设置颜色
+ */
+
+$(function () {
+    //设置颜色
+    $("td").mouseover(function () {
+        $(this).css('border','1px solid red');
+    }).mouseout(function () {
+        $(this).css('border','none');
+    }).click(function () {
+        var color = $(this).css('backgroundColor');
+        myDiagram.selection.each(function(node) {
+            myDiagram.model.setDataProperty(node.data, "color", color);
+            buliddata(node,"changenodecolor",color);
+            $('#SaveButton').attr('disabled',false);
+            var idx = document.title.indexOf("*");
+            if (idx < 0) document.title += "*";
+        });
+    });
+
+    //设置字体
+    for ( var i=9;i<20;i++){
+        $("#fontslt").append("<li class='changesize'>"+i+"pt</li>");
+    }
+    var fonts = ["sans-serif","Impact","Georgia","Tahoma","Arial","Courier New","Consolas","SimSun","SimHei","Microsoft Yahei"];
+    var fontsname = ["sans-serif","Impact","Georgia","Tahoma","Arial","Courier New","Consolas","宋体","黑体","微软雅黑"];
+    for ( var i=0;i<fonts.length;i++){
+        var name=fontsname[i];
+        $("#fontfamily").append("<li class='changefamily'>"+name+"</li>");
+    }
+    $(".changesize,.changefamily").mouseover(function () {
+        $(this).css('backgroundColor','#bbb');
+    }).mouseout(function () {
+        $(this).css('backgroundColor','white');
+    });
+    $(".changesize").click(function () {
+        changeFont($(this).text());
+    });
+    $('.changefamily').click(function () {
+        changeFontfamily(fonts[$(this).index()]);
+    });
+});
+
+
+
+/*
+加载当前组员
+ */
+function loadteam(team){
+    $('#team').empty();
+    $('#team').append('<div style="font-size: 17px;font-family: 微软雅黑;font-weight: bold">小组成员:</div>');
+    for(var i=0;i<team.length;i++){
+        $('#team').append('<div style="font-size: 15px;margin-top: 5px;">'+(i+1)+"."+team[i]+'</div>');
+    }
+}
+
+
+/*
+pdf下载函数
+ */
 function download() {
     html2canvas(document.getElementById("myDiagramDiv"), {
         background: '#ffffff',
@@ -643,7 +1095,7 @@ function download() {
                     pdf.addImage(pageData, 'JPEG', 20, position, imgWidth, imgHeight)
                     leftHeight -= pageHeight;
                     position -= 841.89;
-            //避免添加空白页
+                    //避免添加空白页
                     if (leftHeight > 0) {
                         pdf.addPage();
                     }
@@ -654,96 +1106,5 @@ function download() {
     })
 }
 
-/**********************************************************************************************************************/
-const socket = io('http://47.95.194.211:3006');
-var addr = window.location.href;
-var arr = addr.split('=');
-var id = arr[arr.length-1];
-function save() {
-    var addr = window.location.href;
-    var arr = addr.split('=');
-    var id = arr[arr.length-1];
-    var data = JSON.parse(myDiagram.model.toJson()).nodeDataArray;
-    $.ajax({
-        type:'post',
-        url:'/mind/save',
-        data:{
-            id:id,
-            newData:JSON.stringify(data)
-        },
-        success:function (data) {
-            if(data){
-                if(data.status==='success') {
-                    myDiagram.isModified = false;
-                }
-            }
-        }
-    })
-}
-function load() {
-    $.ajax({
-        type:"post",
-        url:'/mind/load',
-        data:{
-            id:id
-        },
-        success:function (data) {
-            if(data) {
-                var data ='{"class":"go.TreeModel","nodeDataArray":'+data.mymind+'}';
-                myDiagram.model = go.Model.fromJson(data);
-            }
-        }
-    });
-}
-function invite() {
-    if($('#name').val()===''){
-        $('#name').css('borderColor','#f41717');
-        return;
-    }else{
-        $.ajax({
-            type:'post',
-            url:'/username',
-            data:{},
-            success:function (data) {
-                if(data){
-                    socket.emit('invite',{'to':$('#name').val(),
-                                          'from':data.name,
-                                          'url':'http://47.95.194.211:3006/mind/load?id='+id
-                    });
-                    window.location.reload();
-                }
-            }
-        })
-    }
-}
-$(function () {
 
-    $.ajax({
-        type:'post',
-        url:'/username',
-        data:{},
-        success:function (data) {
-            if(data){
-                var user = data.name;
-                socket.on('inOrnot',function (data) {
-                    if(data.in){
-                        $('#LeaveButton').css('visibility','visible');
-                        $('#LeaveButton').bind('click',function () {
-                            if(pastselectednode){
-                                buliddata(pastselectednode,"endselection");
-                            }
-                            socket.emit('leave',{id:id,user:user});
-                            window.location.href="http://47.95.194.211:3006";
-                        });
-                        socket.on('new message',function (data) {
-                            handledata(data);
-                        });
-                    }else if(!data.own){
-                        window.location.href="http://47.95.194.211:3006";
-                    }
-                });
-                socket.emit('rejoin',{'name':data.name,'roomid':id,'socketid':socket.id});
-            }
-        }
-    })
-});
+

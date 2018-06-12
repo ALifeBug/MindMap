@@ -57,11 +57,12 @@ Mind.getOne = function (option,callback) {
 };
 
 Mind.get = function (option,callback) {
-    mindModel.find(option,function(error,mind){
+    mindModel.find(option).sort([['_id',-1]]).exec(function(error,mind){
         if(error)
             callback(error);
         callback(null,mind);
     })
+
 };
 
 Mind.update = function (id,data,options,callback) {

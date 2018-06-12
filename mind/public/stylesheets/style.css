@@ -8,9 +8,16 @@
 h1{
     font-family: Consolas;
     text-align: center;
+    font-weight: bold;
 }
 h1 a{
     color: #6610f2;
+    text-shadow: 0 0 5px #007bff;
+    text-decoration: none;
+}
+h1 a:hover{
+    color: #fd7e14;
+    text-shadow:0 0 5px #dc3545;
     text-decoration: none;
 }
 header{
@@ -22,7 +29,7 @@ nav{
     font-family: "微软雅黑",serif;
     text-align: center;
     font-size: 17px;
-    margin-left: -130px;
+    margin-left: -150px;
     margin-top: 10px;
 }
 nav a{
