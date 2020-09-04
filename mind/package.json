@@ -16,7 +16,7 @@
     "gojs": "^1.8.20",
     "html2canvas": "^1.0.0-alpha.12",
     "http-errors": "~1.6.2",
-    "mongodb": "2.2.20",
+    "mongodb": "3.6.1",
     "mongoose": "^5.1.2",
     "morgan": "~1.9.0",
     "nodemailer": "*",
